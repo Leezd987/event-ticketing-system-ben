@@ -46,5 +46,14 @@ else
     > /var/www/html/healthz.php
 fi
 
+# Self-seed without SSM: db-init.yml's upload step (runner-side, no SSM
+# needed) puts schema.sql in S3. Import it on first boot when empty.
+if aws s3api head-object --bucket "${artifact_bucket}" --key "db-init/schema.sql" --region "${aws_region}" >/dev/null 2>&1; then
+  aws s3 cp "s3://${artifact_bucket}/db-init/schema.sql" /tmp/seed-schema.sql --region "${aws_region}"
+  if [ "$(mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_name='users'")" = "0" ]; then
+    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" < /tmp/seed-schema.sql
+  fi
+fi
+
 systemctl enable httpd
 systemctl restart httpd
