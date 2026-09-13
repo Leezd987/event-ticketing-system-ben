@@ -76,24 +76,6 @@ jobs:
           aws s3 cp assignment-app.zip \
             "s3://${{ env.ARTIFACT_BUCKET }}/${{ env.ARTIFACT_PREFIX }}/assignment-app.zip"
 
-      - name: Roll ASG instances to the new application artifact
+      - name: Deploy app artifact note
         run: |
-          set -euo pipefail
-
-          ASG_NAME="${{ needs.infra.outputs.asg_name }}"
-
-          if [ -z "$ASG_NAME" ]; then
-            echo "No ASG name returned from Terraform apply output."
-            exit 1
-          fi
-
-          echo "Starting instance refresh for ASG $ASG_NAME..."
-          aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "$ASG_NAME" \
-            --preferences '{"MinHealthyPercentage":50,"InstanceWarmup":300}'
-
-          echo "Waiting for instance refresh to finish..."
-          aws autoscaling wait instance-refresh-complete \
-            --auto-scaling-group-name "$ASG_NAME"
-
-          echo "ASG instance refresh completed."
+          echo "Artifact uploaded to S3. Re-run apply or recreate the environment if you need the latest app code on EC2."
