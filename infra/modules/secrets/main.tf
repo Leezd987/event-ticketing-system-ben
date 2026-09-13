@@ -2,13 +2,26 @@
 # info. EC2 instances read this at boot instead of having credentials baked into
 # an AMI or passed in plaintext user-data.
 #
-# In AWS Academy Learner Lab, the pre-provisioned role behind LabInstanceProfile
-# commonly does not include the AWS managed SSM policy needed for EC2 agents to
-# register with SSM. Attach it directly to the existing LabRole instead of
-# trying to create a new role or custom permissions model.
-resource "aws_iam_role_policy_attachment" "ssm_core" {
-  role       = "LabRole"
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+# In AWS Academy Learner Lab, the pre-provisioned LabRole already exists, but
+# the lab account typically does not permit attaching new managed policies.
+# Grant the app's existing role explicit Secrets Manager read access instead.
+resource "aws_iam_role_policy" "db_secret_read" {
+  name = "assignment-db-secret-read"
+  role = "LabRole"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "RetrieveDbSecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.db.arn
+      }
+    ]
+  })
 }
 
 resource "aws_secretsmanager_secret" "db" {
