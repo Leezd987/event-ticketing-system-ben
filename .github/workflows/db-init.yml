@@ -75,16 +75,15 @@ jobs:
           password = data['password']
           dbname = data['dbname']
 
-          with open('event-ticketing/schema.sql', 'r', encoding='utf-8') as f:
-              schema_sql = f.read()
-
           with open('/tmp/schema.sql', 'w', encoding='utf-8') as f:
-              f.write(schema_sql)
+              f.write(open('event-ticketing/schema.sql', 'r', encoding='utf-8').read())
 
-          subprocess.run(
-              f"mysql -h{host} -u{user} -p{password} {dbname} < /tmp/schema.sql",
-              shell=True,
-              check=True,
-          )
+          with open('/tmp/schema.sql', 'r', encoding='utf-8') as schema_file:
+              subprocess.run(
+                  ["mysql", "-h", host, "-u", user, f"-p{password}", dbname],
+                  stdin=schema_file,
+                  check=True,
+              )
+
           print('Schema imported into RDS successfully.')
           PY
