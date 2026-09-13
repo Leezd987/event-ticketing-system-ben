@@ -16,12 +16,22 @@ on:
           - apply
           - destroy
         default: plan
+      replace_target:
+        description: "Optional Terraform resource to replace during apply, e.g. module.rds.aws_db_instance.this"
+        required: false
+        default: ""
+        type: string
   workflow_call:
     inputs:
       action:
         description: "Terraform action to run (plan / apply / destroy)"
         required: true
         type: string
+      replace_target:
+        description: "Optional Terraform resource to replace during apply"
+        required: false
+        type: string
+        default: ""
     outputs:
       s3_bucket:
         description: "Resolved uploads/artifacts S3 bucket name (from terraform output). Only populated on apply."
@@ -78,7 +88,12 @@ jobs:
 
       - name: Terraform apply
         if: ${{ inputs.action == 'apply' }}
-        run: terraform apply -auto-approve
+        run: |
+          if [ -n "${{ inputs.replace_target }}" ]; then
+            terraform apply -replace="${{ inputs.replace_target }}" -auto-approve
+          else
+            terraform apply -auto-approve
+          fi
 
       # Expose the resolved bucket name so deploy.yml (which calls this workflow)
       # can target the right bucket without hardcoding it - Terraform stays the
