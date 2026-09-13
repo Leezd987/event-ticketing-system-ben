@@ -2,20 +2,12 @@
 # info. EC2 instances read this at boot instead of having credentials baked into
 # an AMI or passed in plaintext user-data.
 #
-# In AWS Academy Learner Lab, the pre-provisioned `LabInstanceProfile`
+# In AWS Academy Learner Lab, the pre-provisioned role behind LabInstanceProfile
 # commonly does not include the AWS managed SSM policy needed for EC2 agents to
-# register with SSM. Reuse the existing role and attach the managed policy
-# instead of creating a new role or custom permissions model.
-data "aws_iam_instance_profile" "lab" {
-  name = var.instance_profile_name
-}
-
-locals {
-  lab_role_name = data.aws_iam_instance_profile.lab.roles[0]
-}
-
+# register with SSM. Attach it directly to the existing LabRole instead of
+# trying to create a new role or custom permissions model.
 resource "aws_iam_role_policy_attachment" "ssm_core" {
-  role       = local.lab_role_name
+  role       = "LabRole"
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 

@@ -10,12 +10,6 @@ variable "secret_name" {
   default     = "assignment-db-credentials"
 }
 
-variable "instance_profile_name" {
-  description = "Existing AWS Academy IAM instance profile whose backing role should receive SSM permissions."
-  type        = string
-  default     = "LabInstanceProfile"
-}
-
 variable "db_host" {
   description = "RDS endpoint address."
   type        = string
