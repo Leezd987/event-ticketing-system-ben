@@ -10,8 +10,9 @@ SECRET_ID="assignment-db-credentials"
 SCHEMA_S3_URI="$1"
 BUCKET_NAME="${2:-}"
 
-SECRET_JSON=$(aws secretsmanager get-secret-value \
-  --secret-id "$SECRET_ID" --region "$AWS_REGION" --query SecretString --output text)
+SECRET_JSON=$(aws ssm get-parameter \
+  --name "$SECRET_ID" --region "$AWS_REGION" --with-decryption \
+  --query Parameter.Value --output text)
 
 DB_HOST=$(echo "$SECRET_JSON" | jq -r .host)
 DB_USER=$(echo "$SECRET_JSON" | jq -r .username)

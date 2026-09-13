@@ -4,12 +4,13 @@ set -euxo pipefail
 dnf update -y
 dnf install -y httpd php php-mysqlnd php-cli jq unzip mariadb105
 
-# Pull DB connection details from Secrets Manager (assignment-db-credentials)
+# Pull DB connection details from SSM Parameter Store (assignment-db-credentials)
 # using this instance's IAM role - no credentials are ever hardcoded here.
-SECRET_JSON=$(aws secretsmanager get-secret-value \
-  --secret-id "${secret_arn}" \
+SECRET_JSON=$(aws ssm get-parameter \
+  --name "${secret_arn}" \
   --region "${aws_region}" \
-  --query SecretString --output text)
+  --with-decryption \
+  --query Parameter.Value --output text)
 
 DB_HOST=$(echo "$SECRET_JSON" | jq -r .host)
 DB_USER=$(echo "$SECRET_JSON" | jq -r .username)
