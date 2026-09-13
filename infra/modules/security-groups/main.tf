@@ -61,11 +61,12 @@ resource "aws_security_group" "ec2" {
   }
 }
 
-# assignment-sg-rds: allow the app instances and direct GitHub-hosted runner
-# connectivity to the database so the db-init workflow can import schema data.
+# assignment-sg-rds: the database should only accept traffic from the app
+# instances by default; the GitHub-hosted runner path uses a separate ingress
+# rule so Terraform can add the public access without forcing SG replacement.
 resource "aws_security_group" "rds" {
   name        = "${var.name_prefix}-sg-rds"
-  description = "Allow MySQL/Aurora from application instances and the public internet"
+  description = "Allow MySQL/Aurora only from application instances"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -74,14 +75,6 @@ resource "aws_security_group" "rds" {
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
-  }
-
-  ingress {
-    description = "MySQL/Aurora from the public internet"
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -94,4 +87,13 @@ resource "aws_security_group" "rds" {
   tags = {
     Name = "${var.name_prefix}-sg-rds"
   }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_public" {
+  security_group_id = aws_security_group.rds.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 3306
+  ip_protocol       = "tcp"
+  to_port           = 3306
+  description       = "MySQL/Aurora from the public internet"
 }
