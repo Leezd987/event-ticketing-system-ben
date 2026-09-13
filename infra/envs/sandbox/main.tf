@@ -41,7 +41,7 @@ module "rds" {
   source = "../../modules/rds"
 
   name_prefix        = var.name_prefix
-  private_subnet_ids = module.vpc.private_subnet_ids
+  private_subnet_ids = module.vpc.public_subnet_ids
   rds_sg_id          = module.security_groups.rds_sg_id
   db_name            = var.db_name
   db_username        = var.db_username
