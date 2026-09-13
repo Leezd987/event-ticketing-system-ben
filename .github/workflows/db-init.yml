@@ -44,6 +44,7 @@ jobs:
           terraform init -input=false
           echo "RDS_ENDPOINT=$(terraform output -raw rds_endpoint)" >> "$GITHUB_ENV"
           echo "SCHEMA_BUCKET=$(terraform output -raw s3_bucket_name)" >> "$GITHUB_ENV"
+          echo "ASG_NAME=$(terraform output -raw asg_name)" >> "$GITHUB_ENV"
 
       - name: Upload schema.sql, seed script, and sample images to S3
         run: |
@@ -52,38 +53,39 @@ jobs:
           aws s3 sync event-ticketing/uploads/ "s3://${{ env.SCHEMA_BUCKET }}/uploads/" \
             --exclude "index.html"
 
-      - name: Read DB credentials from SSM Parameter Store and import schema into RDS
+      - name: Run seed script on a running app instance via SSM
         run: |
           set -euo pipefail
 
-          echo "Fetching DB credentials from SSM Parameter Store..."
-          aws ssm get-parameter \
-            --name assignment-db-credentials \
-            --with-decryption \
-            --query Parameter.Value \
-            --output text > db-creds.json
+          INSTANCE_ID=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-names "$ASG_NAME" \
+            --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService' && HealthStatus=='Healthy'].InstanceId | [0]" \
+            --output text)
 
-          python - <<'PY'
-          import json
-          import subprocess
-          
-          with open('db-creds.json', 'r', encoding='utf-8') as f:
-              data = json.load(f)
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
+            echo "No healthy InService instance found in ASG $ASG_NAME - apply infra and wait for a healthy instance first."
+            exit 1
+          fi
 
-          host = data['host']
-          user = data['username']
-          password = data['password']
-          dbname = data['dbname']
+          PING_STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+            --query "InstanceInformationList[0].PingStatus" --output text)
 
-          with open('/tmp/schema.sql', 'w', encoding='utf-8') as f:
-              f.write(open('event-ticketing/schema.sql', 'r', encoding='utf-8').read())
+          if [ "$PING_STATUS" != "Online" ]; then
+            echo "Instance $INSTANCE_ID is not SSM-online (status: $PING_STATUS)."
+            exit 1
+          fi
 
-          with open('/tmp/schema.sql', 'r', encoding='utf-8') as schema_file:
-              subprocess.run(
-                  ["mysql", "-h", host, "-u", user, f"-p{password}", dbname],
-                  stdin=schema_file,
-                  check=True,
-              )
+          COMMAND_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$INSTANCE_ID" \
+            --comment "assignment-event-ticketing db seed" \
+            --parameters '{"commands":[
+              "aws s3 cp s3://${{ env.SCHEMA_BUCKET }}/${{ env.SCRIPT_KEY }} /tmp/seed-db.sh",
+              "chmod +x /tmp/seed-db.sh",
+              "AWS_REGION=${{ env.AWS_REGION }} /tmp/seed-db.sh s3://${{ env.SCHEMA_BUCKET }}/${{ env.SCHEMA_KEY }} ${{ env.SCHEMA_BUCKET }}"
+            ]}' \
+            --query "Command.CommandId" --output text)
 
-          print('Schema imported into RDS successfully.')
-          PY
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
