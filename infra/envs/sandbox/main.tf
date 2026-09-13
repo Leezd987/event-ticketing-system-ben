@@ -51,12 +51,13 @@ module "rds" {
 module "secrets" {
   source = "../../modules/secrets"
 
-  name_prefix = var.name_prefix
-  secret_name = var.secret_name
-  db_host     = module.rds.db_address
-  db_name     = var.db_name
-  db_username = var.db_username
-  db_password = random_password.db.result
+  name_prefix           = var.name_prefix
+  secret_name           = var.secret_name
+  instance_profile_name = var.instance_profile_name
+  db_host               = module.rds.db_address
+  db_name               = var.db_name
+  db_username           = var.db_username
+  db_password           = random_password.db.result
 }
 
 module "alb" {
