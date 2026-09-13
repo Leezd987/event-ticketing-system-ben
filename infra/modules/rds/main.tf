@@ -27,7 +27,7 @@ resource "aws_db_instance" "this" {
   vpc_security_group_ids = [var.rds_sg_id]
 
   multi_az            = false
-  publicly_accessible = false
+  publicly_accessible = true
 
   # Sandbox environment: prioritize cheap/disposable over durability.
   skip_final_snapshot     = true

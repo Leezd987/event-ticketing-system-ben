@@ -61,10 +61,11 @@ resource "aws_security_group" "ec2" {
   }
 }
 
-# assignment-sg-rds: only the app instances may reach the database.
+# assignment-sg-rds: allow the app instances and direct GitHub-hosted runner
+# connectivity to the database so the db-init workflow can import schema data.
 resource "aws_security_group" "rds" {
   name        = "${var.name_prefix}-sg-rds"
-  description = "Allow MySQL/Aurora only from application instances"
+  description = "Allow MySQL/Aurora from application instances and the public internet"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -73,6 +74,14 @@ resource "aws_security_group" "rds" {
     to_port         = 3306
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2.id]
+  }
+
+  ingress {
+    description = "MySQL/Aurora from the public internet"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
